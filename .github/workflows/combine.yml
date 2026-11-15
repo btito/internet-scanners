@@ -1,0 +1,59 @@
+name: Sync upstream and build combined lists
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # daily, 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: combine
+  cancel-in-progress: false
+
+jobs:
+  combine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream (OpenFilters/internet-scanners)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/OpenFilters/internet-scanners.git
+          git fetch --quiet upstream main
+          git merge --no-edit upstream/main
+
+      - name: Build combined lists
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          mkdir -p combined
+          combine() {
+            local out="$1"; shift
+            if (($# == 0)); then echo "no source files for $out" >&2; exit 1; fi
+            cat "$@" \
+              | tr -d '\r' \
+              | sed -e 's/[[:space:]]*#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+              | grep -v '^$' \
+              | sort -u > "$out"
+            # refuse to publish a suspiciously small list
+            [ "$(wc -l < "$out")" -ge 10 ] || { echo "$out too small, aborting" >&2; exit 1; }
+            echo "$out: $(wc -l < "$out") entries from $# files"
+          }
+          combine combined/scanners_v4.txt cidr/*_v4.txt
+          combine combined/scanners_v6.txt cidr/*_v6.txt
+
+      - name: Commit and push
+        run: |
+          git add combined/
+          if git diff --cached --quiet; then
+            echo "No list changes"
+          else
+            git commit -m "Update combined scanner lists ($(date -u +%F))"
+          fi
+          git push origin HEAD
