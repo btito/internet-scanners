@@ -4,6 +4,7 @@ List of IPs belonging to common internet-wide scanning organizations.
 The data is provided in the following formats:
 - nftables
 - cidr
+- combined for use with unifi dynamic network lists
 
 List currently contains data for the following organizations:
 - 360 Quake (quake.360.net)
