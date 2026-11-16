@@ -30,23 +30,8 @@ jobs:
 
       - name: Build combined lists
         run: |
-          set -euo pipefail
-          shopt -s nullglob
           mkdir -p combined
-          combine() {
-            local out="$1"; shift
-            if (($# == 0)); then echo "no source files for $out" >&2; exit 1; fi
-            cat "$@" \
-              | tr -d '\r' \
-              | sed -e 's/[[:space:]]*#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
-              | grep -v '^$' \
-              | sort -u > "$out"
-            # refuse to publish a suspiciously small list
-            [ "$(wc -l < "$out")" -ge 10 ] || { echo "$out too small, aborting" >&2; exit 1; }
-            echo "$out: $(wc -l < "$out") entries from $# files"
-          }
-          combine combined/scanners_v4.txt cidr/*_v4.txt
-          combine combined/scanners_v6.txt cidr/*_v6.txt
+          python3 scripts/combine.py
 
       - name: Commit and push
         run: |
